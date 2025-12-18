@@ -1,4 +1,6 @@
 Flask
+Flask-Cors
 python-dotenv
 SQLAlchemy
-Flask-Cors
+twilio
+schedule

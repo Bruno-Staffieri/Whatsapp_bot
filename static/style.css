@@ -1,0 +1,159 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #0f0524;
+    font-family: Arial, sans-serif;
+    color: #f1f1f1;
+}
+
+.container {
+    max-width: 520px;
+    margin: 40px auto;
+    padding: 20px;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.card {
+    background: #191633;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+.card.center {
+    text-align: center;
+}
+
+label {
+    font-weight: bold;
+    margin-bottom: 12px;
+    display: block;
+}
+
+/* INPUTS */
+input,
+textarea {
+    width: 100%;
+    min-height: 42px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: none;
+    background: #494646;
+    color: #ffffff;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+/* BOTONES */
+button {
+    height: 42px;
+    background: #03c754;
+    border: none;
+    border-radius: 8px;
+    color: #000;
+    font-weight: bold;
+    cursor: pointer;
+    
+}
+
+button:hover {
+    background: #00b44a;
+}
+
+button.secondary {
+    width: 100%;
+    background: #0091ea;
+    margin-top: 10px;
+}
+
+button.secondary:hover {
+    background: #007acc;
+}
+
+/* HORARIO */
+.time-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.time-row input {
+    width: 70px;
+    text-align: center;
+}
+
+.time-row span {
+    font-size: 22px;
+}
+
+/* DESTINATARIOS */
+.add-recipient {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.add-recipient input {
+    flex: 1;
+}
+
+#recipient-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#recipient-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #2f2f2f;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    font-size: 14px;
+}
+
+#recipient-list button {
+    background: #ff5252;
+    color: white;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    font-weight: bold;
+}
+
+#recipient-list button:hover {
+    background: #ff1744;
+}
+
+/* ESTADOS */
+.status {
+    margin-top: 8px;
+    font-size: 13px;
+    height: 16px;
+}
+
+.status.success {
+    color: #00e676;
+}
+
+.status.error {
+    color: #ff5252;
+}
+
+.center-button {
+    display: flex;
+    justify-content: center;
+    margin-top: 10px;
+}
+

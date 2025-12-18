@@ -3,84 +3,171 @@
 <head>
     <meta charset="UTF-8">
     <title>WhatsApp Scheduler</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; }
-        input, button, textarea { display: block; margin: 10px 0; width: 300px; padding: 5px; }
-        label { font-weight: bold; margin-top: 20px; }
-    </style>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <h1>WhatsApp Scheduler</h1>
 
-    <div>
-        <label for="message">Mensaje:</label>
-        <textarea id="message" rows="4"></textarea>
-        <button onclick="saveMessage()">Guardar Mensaje</button>
+<div class="container">
+    <h1>Mensaje Programado</h1>
+
+    <!-- MENSAJE -->
+    <div class="card center">
+        <label>Mensaje</label>
+
+        <textarea
+            id="message"
+            rows="4"
+            placeholder="Escribí el mensaje...">
+        </textarea>
+
+        <div class="center-button">
+            <button onclick="saveMessage()">Guardar mensaje</button>
+        </div>
+
+        <div id="status-message" class="status"></div>
     </div>
 
-    <div>
-        <label for="hour">Hora de envío:</label>
-        <input type="number" id="hour" min="0" max="23">
-        <label for="minute">Minuto de envío:</label>
-        <input type="number" id="minute" min="0" max="59">
-        <button onclick="saveSchedule()">Guardar Horario</button>
+    <!-- HORARIO -->
+    <div class="card center">
+        <label>Hora de envío</label>
+
+        <div class="time-row">
+            <input type="number" id="hour" min="0" max="23" placeholder="HH">
+            <span>:</span>
+            <input type="number" id="minute" min="0" max="59" placeholder="MM">
+        </div>
+
+        <button onclick="saveSchedule()">Guardar horario</button>
+        <div id="status-schedule" class="status"></div>
     </div>
 
-    <div>
-        <label for="recipients">Destinatarios (separados por coma):</label>
-        <input type="text" id="recipients">
-        <button onclick="saveRecipients()">Guardar Números</button>
-    </div>
+    <!-- DESTINATARIOS -->
+    <div class="card center">
+        <label>Destinatarios WhatsApp</label>
 
-    <script>
-        // Cargar la configuración inicial
-        async function loadConfig() {
-            try {
-                const res = await fetch('/api/get-config');
-                const data = await res.json();
-                if (!data.error) {
-                    document.getElementById('message').value = data.message;
-                    document.getElementById('hour').value = data.send_hour;
-                    document.getElementById('minute').value = data.send_minute;
-                    document.getElementById('recipients').value = data.recipients.join(',');
-                }
-            } catch (err) {
-                console.error(err);
+        <div class="add-recipient">
+            <input
+                type="text"
+                id="recipient-input"
+                placeholder="whatsapp:+5491132524633"
+            >
+            <button onclick="addRecipient()">Agregar</button>
+        </div>
+
+        <ul id="recipient-list"></ul>
+
+        <button class="secondary" onclick="saveRecipients()">Guardar destinatarios</button>
+        <div id="status-recipients" class="status"></div>
+    </div>
+</div>
+
+<script>
+    const message = document.getElementById("message");
+    const hour = document.getElementById("hour");
+    const minute = document.getElementById("minute");
+    const recipientInput = document.getElementById("recipient-input");
+    const recipientList = document.getElementById("recipient-list");
+
+    let recipients = [];
+
+    function showStatus(id, text, ok = true) {
+        const el = document.getElementById(id);
+        el.textContent = text;
+        el.className = "status " + (ok ? "success" : "error");
+
+        setTimeout(() => {
+            el.textContent = "";
+            el.className = "status";
+        }, 3000);
+    }
+
+    function renderRecipients() {
+        recipientList.innerHTML = "";
+        recipients.forEach((num, index) => {
+            const li = document.createElement("li");
+            li.innerHTML = `
+                <span>${num}</span>
+                <button onclick="removeRecipient(${index})">✕</button>
+            `;
+            recipientList.appendChild(li);
+        });
+    }
+
+    function addRecipient() {
+        const value = recipientInput.value.trim();
+        if (!value) return;
+
+        recipients.push(value);
+        recipientInput.value = "";
+        renderRecipients();
+    }
+
+    function removeRecipient(index) {
+        recipients.splice(index, 1);
+        renderRecipients();
+    }
+
+    async function loadConfig() {
+        try {
+            const res = await fetch("/api/get-config");
+            const data = await res.json();
+
+            if (!data.error) {
+                message.value = data.message || "";
+                hour.value = data.send_hour ?? "";
+                minute.value = data.send_minute ?? "";
+                recipients = data.recipients || [];
+                renderRecipients();
             }
+        } catch {
+            showStatus("status-message", "Error cargando datos", false);
         }
+    }
 
-        async function saveMessage() {
-            const message = document.getElementById('message').value;
-            const res = await fetch('/api/set-config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message })
+    async function saveMessage() {
+        try {
+            await fetch("/api/set-config", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: message.value })
             });
-            alert('Mensaje guardado');
+            showStatus("status-message", "Mensaje guardado");
+        } catch {
+            showStatus("status-message", "Error al guardar", false);
         }
+    }
 
-        async function saveSchedule() {
-            const send_hour = parseInt(document.getElementById('hour').value);
-            const send_minute = parseInt(document.getElementById('minute').value);
-            const res = await fetch('/api/set-config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ send_hour, send_minute })
+    async function saveSchedule() {
+        try {
+            await fetch("/api/set-config", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    send_hour: hour.value,
+                    send_minute: minute.value
+                })
             });
-            alert('Horario guardado');
+            showStatus("status-schedule", "Horario guardado");
+        } catch {
+            showStatus("status-schedule", "Error al guardar", false);
         }
+    }
 
-        async function saveRecipients() {
-            const recipients = document.getElementById('recipients').value.split(',').map(s => s.trim());
-            const res = await fetch('/api/set-recipients', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+    async function saveRecipients() {
+        try {
+            await fetch("/api/set-recipients", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ recipients })
             });
-            alert('Números guardados');
+            showStatus("status-recipients", "Destinatarios guardados");
+        } catch {
+            showStatus("status-recipients", "Error al guardar", false);
         }
+    }
 
-        loadConfig();
-    </script>
+    loadConfig();
+</script>
+
 </body>
 </html>
