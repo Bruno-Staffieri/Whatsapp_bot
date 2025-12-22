@@ -15,7 +15,7 @@ from models import UserConfig, Recipient
 # =========================
 ACCOUNT_SID = os.environ.get("ACCOUNT_SID")
 AUTH_TOKEN = os.environ.get("AUTH_TOKEN")
-FROM_NUMBER = os.environ.get("FROM_NUMBER")  # ej: whatsapp:+14155238886
+FROM_NUMBER = os.environ.get("FROM_NUMBER")  # whatsapp:+14155238886
 
 if not all([ACCOUNT_SID, AUTH_TOKEN, FROM_NUMBER]):
     raise RuntimeError("Faltan variables de entorno de Twilio")
@@ -50,9 +50,12 @@ def get_config_api():
         if not cfg:
             return jsonify({"error": "No config"}), 404
 
+        # Convertir hora guardada (UTC) a Argentina (UTC-3)
+        hour_ar = (cfg.send_hour - 3) % 24
+
         return jsonify({
             "message": cfg.message,
-            "send_hour": cfg.send_hour,
+            "send_hour": hour_ar,
             "send_minute": cfg.send_minute,
             "recipients": [r.phone for r in recipients]
         })
@@ -71,9 +74,19 @@ def set_config_api():
             cfg = UserConfig()
             session.add(cfg)
 
-        cfg.message = data.get("message", cfg.message)
-        cfg.send_hour = int(data.get("send_hour"))
-        cfg.send_minute = int(data.get("send_minute"))
+        if "message" in data:
+            cfg.message = data["message"]
+
+        if "send_hour" in data and "send_minute" in data:
+            # Hora que ingresa el usuario (Argentina UTC-3)
+            send_hour_ar = int(data["send_hour"])
+            send_minute = int(data["send_minute"])
+
+            # Convertir a UTC para guardar
+            send_hour_utc = (send_hour_ar + 3) % 24
+
+            cfg.send_hour = send_hour_utc
+            cfg.send_minute = send_minute
 
         session.commit()
         return jsonify({"status": "ok"})
@@ -90,22 +103,23 @@ def set_recipients_api():
     try:
         session.query(Recipient).delete()
         for n in numbers:
-            session.add(Recipient(phone=n))
+            if n:
+                session.add(Recipient(phone=n))
         session.commit()
         return jsonify({"status": "ok"})
     finally:
         session.close()
 
 # =========================
-# SCHEDULER
+# SCHEDULER (UTC)
 # =========================
 def scheduler_loop():
-    print("Scheduler iniciado")
+    print("Scheduler iniciado (UTC)")
 
     last_sent_date = None
 
     while True:
-        now = datetime.utcnow()  # PythonAnywhere = UTC
+        now = datetime.utcnow()  # PythonAnywhere usa UTC
         session: Session = get_session()
 
         try:
