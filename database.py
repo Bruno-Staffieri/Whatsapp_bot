@@ -33,9 +33,7 @@ def get_config():
                 "recipients": []
             }
 
-        recipients = [
-            r.phone for r in session.query(Recipient).all()
-        ]
+        recipients = [r.phone for r in session.query(Recipient).all()]
 
         return {
             "message": config.message,
