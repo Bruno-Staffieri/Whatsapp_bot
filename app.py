@@ -5,141 +5,149 @@ from datetime import datetime
 
 from flask import Flask, render_template, request, jsonify
 from twilio.rest import Client
+from sqlalchemy.orm import Session
 
-from database import init_db, get_config, save_config, save_recipients
+from database import init_db, get_session
+from models import UserConfig, Recipient
 
-# -------------------------
-# Configuración Flask
-# -------------------------
+# =========================
+# VARIABLES DE ENTORNO
+# =========================
+ACCOUNT_SID = os.environ.get("ACCOUNT_SID")
+AUTH_TOKEN = os.environ.get("AUTH_TOKEN")
+FROM_NUMBER = os.environ.get("FROM_NUMBER")  # ej: whatsapp:+14155238886
+
+if not all([ACCOUNT_SID, AUTH_TOKEN, FROM_NUMBER]):
+    raise RuntimeError("Faltan variables de entorno de Twilio")
+
+client = Client(ACCOUNT_SID, AUTH_TOKEN)
+
+# =========================
+# FLASK
+# =========================
 app = Flask(__name__)
 
-# -------------------------
-# Variables de entorno (Render / .env local)
-# -------------------------
-TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID")
-TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN")
-TWILIO_WHATSAPP_FROM = os.environ.get("TWILIO_WHATSAPP_FROM")
-
-client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-
-# -------------------------
-# Inicializar base de datos
-# -------------------------
+# =========================
+# DB
+# =========================
 init_db()
 
-# -------------------------
+# =========================
 # RUTAS WEB
-# -------------------------
+# =========================
 @app.route("/")
 def index():
     return render_template("index.html")
 
 
-# -------------------------
-# API: Obtener configuración
-# -------------------------
 @app.route("/api/get-config", methods=["GET"])
-def api_get_config():
-    config = get_config()
-    if not config:
-        return jsonify({"error": "No hay configuración"}), 404
+def get_config_api():
+    session: Session = get_session()
+    try:
+        cfg = session.query(UserConfig).first()
+        recipients = session.query(Recipient).all()
 
-    return jsonify({
-        "message": config["message"],
-        "send_hour": config["send_hour"],
-        "send_minute": config["send_minute"],
-        "recipients": config["recipients"]
-    })
+        if not cfg:
+            return jsonify({"error": "No config"}), 404
+
+        return jsonify({
+            "message": cfg.message,
+            "send_hour": cfg.send_hour,
+            "send_minute": cfg.send_minute,
+            "recipients": [r.phone for r in recipients]
+        })
+    finally:
+        session.close()
 
 
-# -------------------------
-# API: Guardar mensaje / horario
-# -------------------------
 @app.route("/api/set-config", methods=["POST"])
-def api_set_config():
+def set_config_api():
     data = request.json or {}
 
-    message = data.get("message")
-    send_hour = data.get("send_hour")
-    send_minute = data.get("send_minute")
+    session: Session = get_session()
+    try:
+        cfg = session.query(UserConfig).first()
+        if not cfg:
+            cfg = UserConfig()
+            session.add(cfg)
 
-    save_config(
-        message=message,
-        send_hour=send_hour,
-        send_minute=send_minute
-    )
+        cfg.message = data.get("message", cfg.message)
+        cfg.send_hour = int(data.get("send_hour"))
+        cfg.send_minute = int(data.get("send_minute"))
 
-    return jsonify({"status": "ok"})
+        session.commit()
+        return jsonify({"status": "ok"})
+    finally:
+        session.close()
 
 
-# -------------------------
-# API: Guardar destinatarios
-# -------------------------
 @app.route("/api/set-recipients", methods=["POST"])
-def api_set_recipients():
+def set_recipients_api():
     data = request.json or {}
-    recipients = data.get("recipients", [])
+    numbers = data.get("recipients", [])
 
-    save_recipients(recipients)
+    session: Session = get_session()
+    try:
+        session.query(Recipient).delete()
+        for n in numbers:
+            session.add(Recipient(phone=n))
+        session.commit()
+        return jsonify({"status": "ok"})
+    finally:
+        session.close()
 
-    return jsonify({"status": "ok"})
-
-
-# -------------------------
-# Scheduler (loop infinito)
-# -------------------------
+# =========================
+# SCHEDULER
+# =========================
 def scheduler_loop():
-    print("Scheduler iniciado. Esperando la hora programada...")
+    print("Scheduler iniciado")
 
     last_sent_date = None
 
     while True:
+        now = datetime.utcnow()  # PythonAnywhere = UTC
+        session: Session = get_session()
+
         try:
-            config = get_config()
-            if not config:
+            cfg = session.query(UserConfig).first()
+            recipients = session.query(Recipient).all()
+
+            if not cfg or not recipients:
                 time.sleep(30)
                 continue
 
-            now = datetime.now()
-            current_hour = now.hour
-            current_minute = now.minute
-            today = now.date()
-
             if (
-                current_hour == config["send_hour"]
-                and current_minute == config["send_minute"]
-                and last_sent_date != today
+                now.hour == cfg.send_hour and
+                now.minute == cfg.send_minute and
+                last_sent_date != now.date()
             ):
-                for number in config["recipients"]:
+                for r in recipients:
                     try:
-                        message = client.messages.create(
-                            from_=f"whatsapp:{TWILIO_WHATSAPP_FROM}",
-                            to=f"whatsapp:{number}",
-                            body=config["message"]
+                        msg = client.messages.create(
+                            from_=FROM_NUMBER,
+                            to=f"whatsapp:{r.phone}",
+                            body=cfg.message
                         )
-                        print(f"Mensaje enviado a {number}. SID: {message.sid}")
+                        print(f"Mensaje enviado a {r.phone} | SID {msg.sid}")
                     except Exception as e:
-                        print(f"Error enviando a {number}: {e}")
+                        print(f"Error enviando a {r.phone}: {e}")
 
-                last_sent_date = today
+                last_sent_date = now.date()
 
-            time.sleep(30)
+        finally:
+            session.close()
 
-        except Exception as e:
-            print("Error en scheduler:", e)
-            time.sleep(30)
+        time.sleep(20)
 
-
-# -------------------------
-# Lanzar scheduler en segundo plano
-# -------------------------
+# =========================
+# THREAD BACKGROUND
+# =========================
 threading.Thread(target=scheduler_loop, daemon=True).start()
 print("Bot iniciado en segundo plano")
 
-
-# -------------------------
-# Arranque Flask (Render)
-# -------------------------
+# =========================
+# START
+# =========================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port)
