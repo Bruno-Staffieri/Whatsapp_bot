@@ -78,14 +78,12 @@ def set_config_api():
             cfg.message = data["message"]
 
         if "send_hour" in data and "send_minute" in data:
-            # Hora que ingresa el usuario (Argentina UTC-3)
+            # Hora ingresada por el usuario (Argentina UTC-3)
             send_hour_ar = int(data["send_hour"])
             send_minute = int(data["send_minute"])
 
             # Convertir a UTC para guardar
-            send_hour_utc = (send_hour_ar + 3) % 24
-
-            cfg.send_hour = send_hour_utc
+            cfg.send_hour = (send_hour_ar + 3) % 24
             cfg.send_minute = send_minute
 
         session.commit()
@@ -116,10 +114,10 @@ def set_recipients_api():
 def scheduler_loop():
     print("Scheduler iniciado (UTC)")
 
-    last_sent_date = None
+    last_sent_key = None  # (fecha, hora, minuto)
 
     while True:
-        now = datetime.utcnow()  # PythonAnywhere usa UTC
+        now = datetime.utcnow()  # PythonAnywhere corre en UTC
         session: Session = get_session()
 
         try:
@@ -130,10 +128,12 @@ def scheduler_loop():
                 time.sleep(30)
                 continue
 
+            current_key = (now.date(), cfg.send_hour, cfg.send_minute)
+
             if (
                 now.hour == cfg.send_hour and
                 now.minute == cfg.send_minute and
-                last_sent_date != now.date()
+                last_sent_key != current_key
             ):
                 for r in recipients:
                     try:
@@ -146,7 +146,7 @@ def scheduler_loop():
                     except Exception as e:
                         print(f"Error enviando a {r.phone}: {e}")
 
-                last_sent_date = now.date()
+                last_sent_key = current_key
 
         finally:
             session.close()
