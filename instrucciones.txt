@@ -1,0 +1,61 @@
+# Instrucciones de instalación y uso - WhatsApp Scheduler
+
+1. Variables de entorno (.env)
+
+   Copiar .env.example a .env y completar con tus credenciales de Twilio:
+   - ACCOUNT_SID: SID de Twilio
+   - AUTH_TOKEN: Token de autenticación
+   - FROM_NUMBER: Número de WhatsApp de Twilio (prefijo whatsapp: obligatorio)
+   - PORT: Puerto donde correrá la página web (opcional, default 10000)
+
+2. Requisitos
+
+   - Python 3.10 o superior
+   - pip (administrador de paquetes)
+   - (Opcional) Cuenta y número de WhatsApp en Twilio
+   - (Opcional) Servidor como PythonAnywhere para mantener el bot siempre activo
+
+3. Instalación
+
+   a) Descargar o clonar el proyecto completo (app.py, database.py, models.py, templates, static)
+
+   b) Crear un entorno virtual
+      Linux/Mac:
+         python3.10 -m venv venv
+         source venv/bin/activate
+      Windows:
+         python3.10 -m venv venv
+         venv\Scripts\activate
+
+   c) Instalar dependencias
+      pip install -r requirements.txt
+
+   d) Configurar variables de entorno
+      Copiar .env.example a .env y completar con tus credenciales de Twilio
+
+   e) Iniciar la aplicación
+      python app.py
+      La página web estará disponible en http://localhost:10000
+      En PythonAnywhere: https://tuusuario.pythonanywhere.com
+
+4. Uso del bot
+
+   - Abrir la página web
+   - Escribir el mensaje de WhatsApp
+   - Seleccionar hora y minuto de envío (hora de Argentina, UTC-3)
+   - Agregar destinatarios con prefijo de país, ejemplo: +5491123456789
+   - Guardar los cambios
+   - El bot enviará los mensajes automáticamente a la hora programada
+
+5. Funcionamiento interno
+
+   - Scheduler revisa cada 20 segundos si es hora de enviar el mensaje
+   - Solo envía si no se envió aún el mensaje del día
+   - Base de datos SQLite: whatsapp_scheduler.db, guarda mensaje, hora y destinatarios
+   - Variables de entorno protegen los datos sensibles
+
+6. Notas importantes
+
+   - El bot debe estar corriendo para enviar mensajes (servidor 24/7 recomendado)
+   - Cambiar mensaje, hora o destinatarios no requiere reiniciar el bot
+   - Cada número de Twilio tiene límite de mensajes según el plan
